@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>異時層称号バッジ確認ツール</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 20px; line-height: 1.4; }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 12px; margin: 12px 0; }
+    label { font-size: 13px; color: #333; display: block; margin-bottom: 6px; }
+    select, input[type="number"], button, input[type="file"], input[type="text"] { padding: 10px; border-radius: 10px; border: 1px solid #ccc; font-size: 14px; }
+    button { cursor: pointer; border: 1px solid #999; background: #fff; }
+    button.primary { background: #111; color: #fff; border-color: #111; }
+    button.danger { background: #b00020; color: #fff; border-color: #b00020; }
+    .muted { color: #666; font-size: 12px; }
+    .list { margin: 8px 0 0; padding-left: 18px; }
+    .pill { display: inline-block; padding: 2px 8px; border: 1px solid #ddd; border-radius: 999px; font-size: 12px; margin-left: 6px; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    @media (min-width: 980px) { .grid { grid-template-columns: 1fr 1fr; } }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border-bottom: 1px solid #eee; padding: 6px 8px; text-align: left; }
+    th { background: #fafafa; position: sticky; top: 0; z-index: 2; }
+    .scroll { max-height: 520px; overflow: auto; border: 1px solid #eee; border-radius: 12px; margin-top: 10px; }
+    .ok { color: #0a7a0a; font-weight: 700; }
+    .ng { color: #b00020; font-weight: 700; }
+    .cellBtn {
+      display:inline-flex; align-items:center; justify-content:center;
+      width: 56px; height: 26px;
+      border-radius: 999px; border:1px solid #ddd;
+      cursor:pointer; user-select:none;
+      background:#fff;
+      font-weight:800;
+    }
+    .cellBtn.true { background:#0a7a0a; color:#fff; border-color:#0a7a0a; }
+    .cellBtn.false { background:#fff; color:#b00020; border-color:#ddd; }
+    .stickyLeft { position: sticky; left: 0; background: #fff; z-index: 3; }
+    .stickyLeft2 { position: sticky; left: 180px; background: #fff; z-index: 3; }
+    .nameCol { min-width: 180px; max-width: 240px; }
+    .ownCol { min-width: 90px; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    .toggle {
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 8px 10px; border:1px solid #ddd; border-radius: 999px;
+      background:#fff;
+    }
+
+    /* Quartz widget */
+    .quartz {
+      position: fixed;
+      right: 14px;
+      top: 14px;
+      background: #111;
+      color: #fff;
+      border-radius: 14px;
+      padding: 10px 12px;
+      box-shadow: 0 10px 26px rgba(0,0,0,.18);
+      z-index: 9999;
+      min-width: 240px;
+    }
+    .quartz .title { font-size: 12px; opacity: .85; margin-bottom: 4px; }
+    .quartz .big { font-size: 16px; font-weight: 800; }
+    .quartz .sub { font-size: 12px; opacity: .85; margin-top: 2px; }
+    .quartz .bar { height: 8px; background: rgba(255,255,255,.18); border-radius: 999px; overflow: hidden; margin-top: 8px; }
+    .quartz .bar > div { height: 100%; background: #fff; width: 0%; }
+  </style>
+</head>
+<body>
+
+  <div class="quartz" id="quartzBox" style="display:none;">
+    <div class="title">残り獲得報酬（クォーツ）</div>
+    <div class="big" id="quartzMain">-</div>
+    <div class="sub" id="quartzSub">-</div>
+    <div class="bar"><div id="quartzBar"></div></div>
+  </div>
+
+  <h1>異時層称号バッジ確認ツール</h1>
+  <p class="muted">
+    ・内臓CSVを読み込むことでダウンロードせずとも開始できます<br>
+    ・表のTRUE/FALSEはクリックで切替できます（手動チェック）<br>
+    ・「所持=OFF」のキャラは抽選/集計から除外されます（未所持対応）<br>
+    ・状態は自動保存（ブラウザ内）
+  </p>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>CSVを読み込む（Excelから保存したCSV）</label>
+        <input id="csvFile" type="file" accept=".csv,text/csv" />
+        <div class="muted">※ 1行目ヘッダー / A列キャラ名 / B列以降キャンサー列（TRUE/FALSE or 1/0）</div>
+      </div>
+
+      <div>
+        <label>すぐ始める</label>
+        <button id="loadBuiltIn">内蔵CSVを読み込む</button>
+        <button id="downloadBuiltIn">内蔵CSVをダウンロード</button>
+        <div class="muted">※ このページにCSVを内蔵（あなたのデータ）</div>
+      </div>
+
+      <div>
+        <label>保存データ</label>
+        <button id="loadSaved">保存を読み込む</button>
+        <button id="clearSaved" class="danger">保存を消す</button>
+        <div class="muted">※ 読み込み後は自動保存されます</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2 style="font-size:16px;margin:0 0 10px;">抽選</h2>
+      <div class="row">
+        <div style="min-width: 260px;">
+          <label>対象キャンサー（列）</label>
+          <select id="monsterSelect" disabled>
+            <option value="">CSVを読み込んでください</option>
+          </select>
+        </div>
+        <div>
+          <label>抽選人数 X</label>
+          <input id="pickN" type="number" min="1" value="6" style="width: 120px;" />
+        </div>
+        <div style="display:flex; gap:8px; align-items:end;">
+          <button id="drawBtn" disabled>抽選</button>
+          <button id="commitBtn" class="primary" disabled>確定（OK）して反映</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px;">
+        <div class="row" style="justify-content: space-between;">
+          <div>
+            <strong>抽選結果</strong>
+            <span id="resultMeta" class="pill">-</span>
+          </div>
+          <div class="muted">抽選を変える：抽選ボタン / または F5</div>
+        </div>
+        <ol id="resultList" class="list"></ol>
+        <div id="resultWarn" class="muted"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:16px;margin:0 0 10px;">確認・書き出し</h2>
+
+      <div class="row">
+        <button id="exportCsv" disabled>CSVで書き出し（所持列つき）</button>
+        <button id="exportJson" disabled>バックアップ(JSON)を書き出し</button>
+      </div>
+      <p class="muted" style="margin-top:8px;">
+        ※ CSV出力は先頭に「所持」列を追加して出します（TRUE=所持 / FALSE=未所持）。
+      </p>
+
+      <div class="card">
+        <strong>確定履歴（最新10件）</strong>
+        <div class="muted">いつ・どのキャンサーで・誰を確定したか</div>
+        <ol id="historyList" class="list"></ol>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <div class="toggle">
+        <input id="hideUnowned" type="checkbox" />
+        <label for="hideUnowned" style="margin:0; font-size:12px;">未所持キャラを表から隠す</label>
+      </div>
+      <div class="toggle">
+        <span class="muted">検索</span>
+        <input id="search" type="text" placeholder="キャラ名で絞り込み" style="padding:8px 10px; border-radius:999px;" />
+      </div>
+      <div class="muted" id="statusText">未読み込み</div>
+    </div>
+
+    <div class="scroll">
+      <table id="table"></table>
+    </div>
+
+    <div class="muted" style="margin-top:10px;">
+      ※ TRUE/FALSEセルをクリックで切替／「所持」もクリックで切替（未所持は抽選とクォーツ集計から除外）
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ===== Built-in CSV (あなたのアップロードCSVを内蔵) =====
+  const BUILTIN_CSV = `\uFEFF,デススラ,ロリ,レックリ,フィーラー,3章フラハン,究極フィーラー,4章フラハン,デデドン,フェザー第一,フェザー第二
+茅森月歌,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+和泉ユキ,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+逢川めぐみ,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+東城つかさ,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+朝倉可憐,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+國見タマ,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+蒼井えりか,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+水瀬いちご,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+山脇・ボン・イヴァール,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+桜庭星羅,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+天音巫呼,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+豊後弥生,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+神崎アーデルハイド,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+佐月マリ,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+室伏理沙,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+大島五十鈴,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+樋口聖華,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+柊木梢,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+瑞原あいな,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+桐生美也,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+菅原千恵,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+蔵里見,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+夏目祈,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+丸山奏多,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+華村詩紀,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+松岡チロル,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+李映夏,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+新井絵梨花,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+茅森月歌（アイドル）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+和泉ユキ（サンタ）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+逢川めぐみ（湯上り）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+東城つかさ（武者）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+朝倉可憐（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+國見タマ（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+蒼井えりか（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+水瀬いちご（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+山脇・ボン・イヴァール（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+桜庭星羅（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+天音巫呼（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+豊後弥生（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+神崎アーデルハイド（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+佐月マリ（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+室伏理沙（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+大島五十鈴（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+樋口聖華（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+柊木梢（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+瑞原あいな（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+桐生美也（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+菅原千恵（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+蔵里見（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+夏目祈（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+丸山奏多（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+華村詩紀（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+松岡チロル（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+李映夏（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE
+新井絵梨花（浴衣）,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE`;
+
+  // ===== Quartz rule =====
+  function monsterQuartz(monsterName) {
+    if (monsterName === "フェザー第一" || monsterName === "フェザー第二") return 30;
+    return 10;
+  }
+
+  // ====== Data model ======
+  // data = { characters:[...], owned:boolean[], monsters:[...], matrix:boolean[][] }
+  let data = null;
+  let lastDraw = null;
+  let history = [];
+
+  const LS_KEY = "monster_check_tool_v_owned";
+
+  // ===== DOM =====
+  const csvFile = document.getElementById("csvFile");
+  const loadBuiltIn = document.getElementById("loadBuiltIn");
+  const downloadBuiltIn = document.getElementById("downloadBuiltIn");
+  const loadSaved = document.getElementById("loadSaved");
+  const clearSaved = document.getElementById("clearSaved");
+
+  const monsterSelect = document.getElementById("monsterSelect");
+  const pickN = document.getElementById("pickN");
+  const drawBtn = document.getElementById("drawBtn");
+  const commitBtn = document.getElementById("commitBtn");
+
+  const resultList = document.getElementById("resultList");
+  const resultMeta = document.getElementById("resultMeta");
+  const resultWarn = document.getElementById("resultWarn");
+
+  const exportCsv = document.getElementById("exportCsv");
+  const exportJson = document.getElementById("exportJson");
+
+  const historyList = document.getElementById("historyList");
+  const table = document.getElementById("table");
+  const statusText = document.getElementById("statusText");
+
+  const hideUnowned = document.getElementById("hideUnowned");
+  const search = document.getElementById("search");
+
+  const quartzBox = document.getElementById("quartzBox");
+  const quartzMain = document.getElementById("quartzMain");
+  const quartzSub = document.getElementById("quartzSub");
+  const quartzBar = document.getElementById("quartzBar");
+
+  // ===== Helpers =====
+  function setEnabled(enabled) {
+    monsterSelect.disabled = !enabled;
+    drawBtn.disabled = !enabled;
+    commitBtn.disabled = !enabled;
+    exportCsv.disabled = !enabled;
+    exportJson.disabled = !enabled;
+    quartzBox.style.display = enabled ? "block" : "none";
+  }
+
+  function normalizeBool(v) {
+    if (v == null) return false;
+    const s = String(v).trim().toLowerCase();
+    return (s === "true" || s === "1" || s === "yes" || s === "y" || s === "〇" || s === "○");
+  }
+
+  function parseCSV(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const rows = [];
+    let row = [];
+    let cell = "";
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      const next = text[i + 1];
+      if (ch === '"') {
+        if (inQuotes && next === '"') { cell += '"'; i++; }
+        else inQuotes = !inQuotes;
+      } else if (ch === ',' && !inQuotes) {
+        row.push(cell); cell = "";
+      } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
+        if (ch === '\r' && next === '\n') i++;
+        row.push(cell); cell = "";
+        if (row.some(x => String(x).trim() !== "")) rows.push(row);
+        row = [];
+      } else {
+        cell += ch;
+      }
+    }
+    row.push(cell);
+    if (row.some(x => String(x).trim() !== "")) rows.push(row);
+    return rows;
+  }
+
+  function escapeCell(v) {
+    const s = String(v ?? "");
+    if (s.includes('"') || s.includes(",") || s.includes("\n") || s.includes("\r")) {
+      return '"' + s.replaceAll('"', '""') + '"';
+    }
+    return s;
+  }
+
+  function toCSVWithOwned(dataObj) {
+    // 先頭に 所持 列を追加
+    const header = ["キャラ", "所持", ...dataObj.monsters];
+    const lines = [header.map(escapeCell).join(",")];
+    for (let i = 0; i < dataObj.characters.length; i++) {
+      const row = [dataObj.characters[i], dataObj.owned[i] ? "TRUE" : "FALSE"];
+      for (let j = 0; j < dataObj.monsters.length; j++) {
+        row.push(dataObj.matrix[i][j] ? "TRUE" : "FALSE");
+      }
+      lines.push(row.map(escapeCell).join(","));
+    }
+    return lines.join("\r\n");
+  }
+
+  function downloadText(filename, text, mime="text/plain") {
+    const blob = new Blob([text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function secureShuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const r = crypto.getRandomValues(new Uint32Array(1))[0];
+      const j = r % (i + 1);
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function save() {
+    if (!data) return;
+    localStorage.setItem(LS_KEY, JSON.stringify({ data, history, ui: { hideUnowned: hideUnowned.checked, search: search.value } }));
+    statusText.textContent = `保存済み / ${new Date().toLocaleString()}`;
+  }
+
+  function loadSavedData() {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+
+  function rebuildMonsterSelect() {
+    monsterSelect.innerHTML = "";
+    data.monsters.forEach((m, idx) => {
+      const opt = document.createElement("option");
+      opt.value = String(idx);
+      opt.textContent = m;
+      monsterSelect.appendChild(opt);
+    });
+  }
+
+  function getVisibleCharIndices() {
+    const q = search.value.trim().toLowerCase();
+    const hide = hideUnowned.checked;
+    const out = [];
+    for (let i = 0; i < data.characters.length; i++) {
+      if (hide && !data.owned[i]) continue;
+      if (q && !data.characters[i].toLowerCase().includes(q)) continue;
+      out.push(i);
+    }
+    return out;
+  }
+
+  function renderTable() {
+    if (!data) { table.innerHTML = ""; return; }
+
+    const mCount = data.monsters.length;
+    const visible = getVisibleCharIndices();
+
+    let html = "<thead><tr>";
+    html += `<th class="stickyLeft nameCol">キャラ</th>`;
+    html += `<th class="stickyLeft2 ownCol">所持</th>`;
+    for (let j = 0; j < mCount; j++) html += `<th>${data.monsters[j]}</th>`;
+    html += "</tr></thead><tbody>";
+
+    for (const i of visible) {
+      html += "<tr>";
+      html += `<td class="stickyLeft nameCol">${data.characters[i]}</td>`;
+      html += `<td class="stickyLeft2 ownCol">
+        <button class="cellBtn ${data.owned[i] ? "true" : "false"}" data-type="own" data-i="${i}">
+          ${data.owned[i] ? "所持" : "未所持"}
+        </button>
+      </td>`;
+      for (let j = 0; j < mCount; j++) {
+        const v = data.matrix[i][j];
+        html += `<td>
+          <button class="cellBtn ${v ? "true" : "false"}" data-type="cell" data-i="${i}" data-j="${j}">
+            ${v ? "TRUE" : "FALSE"}
+          </button>
+        </td>`;
+      }
+      html += "</tr>";
+    }
+    html += "</tbody>";
+    table.innerHTML = html;
+  }
+
+  function renderHistory() {
+    historyList.innerHTML = "";
+    const recent = history.slice(-10).reverse();
+    if (recent.length === 0) {
+      const li = document.createElement("li");
+      li.textContent = "まだ確定履歴はありません。";
+      historyList.appendChild(li);
+      return;
+    }
+    for (const h of recent) {
+      const li = document.createElement("li");
+      li.textContent = `${h.time} / ${h.monster} / ${h.names.join("、")}`;
+      historyList.appendChild(li);
+    }
+  }
+
+  function clearResult() {
+    lastDraw = null;
+    resultList.innerHTML = "";
+    resultMeta.textContent = "-";
+    resultWarn.textContent = "";
+  }
+
+  function buildFromRows(rows) {
+    if (!rows || rows.length < 2) throw new Error("CSVが空、または行数が不足しています。");
+    const header = rows[0];
+    if (header.length < 2) throw new Error("ヘッダーにキャンサー列がありません。");
+
+    // 先頭2列目が「所持」なら読み込む
+    let monstersStart = 1;
+    let hasOwnedCol = false;
+    const second = String(header[1] ?? "").trim();
+    if (second === "所持") { hasOwnedCol = true; monstersStart = 2; }
+
+    const monsters = header.slice(monstersStart).map(s => String(s).trim()).filter(s => s !== "");
+    if (monsters.length < 1) throw new Error("キャンサー列名が読み取れません。");
+
+    const characters = [];
+    const owned = [];
+    const matrix = [];
+
+    for (let r = 1; r < rows.length; r++) {
+      const line = rows[r];
+      const name = String(line[0] ?? "").trim();
+      if (!name) continue;
+
+      characters.push(name);
+      owned.push(hasOwnedCol ? normalizeBool(line[1]) : true); // 所持列がなければ全員所持扱い
+
+      const rowBools = [];
+      for (let j = 0; j < monsters.length; j++) {
+        rowBools.push(normalizeBool(line[monstersStart + j]));
+      }
+      matrix.push(rowBools);
+    }
+
+    if (characters.length === 0) throw new Error("キャラ名が読み取れません（A列が空かも）。");
+    return { characters, owned, monsters, matrix };
+  }
+
+  // ===== Quartz =====
+  function updateQuartz() {
+    if (!data) return;
+
+    const charCountOwned = data.owned.filter(Boolean).length;
+    const mCount = data.monsters.length;
+
+    let totalPerChar = 0;
+    for (let j = 0; j < mCount; j++) totalPerChar += monsterQuartz(data.monsters[j]);
+    const maxTotal = totalPerChar * charCountOwned;
+
+    let earned = 0;
+    for (let j = 0; j < mCount; j++) {
+      const q = monsterQuartz(data.monsters[j]);
+      let trueCount = 0;
+      for (let i = 0; i < data.characters.length; i++) {
+        if (!data.owned[i]) continue;           // 未所持は除外
+        if (data.matrix[i][j]) trueCount++;
+      }
+      earned += trueCount * q;
+    }
+
+    const remaining = Math.max(0, maxTotal - earned);
+    quartzMain.textContent = `${remaining.toLocaleString()} / ${maxTotal.toLocaleString()} クォーツ`;
+    quartzSub.textContent = `獲得済み: ${earned.toLocaleString()}（所持${charCountOwned}名 / 1人最大:${totalPerChar}）`;
+
+    const ratio = maxTotal > 0 ? (earned / maxTotal) * 100 : 0;
+    quartzBar.style.width = `${Math.min(100, Math.max(0, ratio))}%`;
+  }
+
+  // ===== Draw/Commit =====
+  function draw() {
+    if (!data) return;
+    const monsterIdx = Number(monsterSelect.value);
+    const X = Number(pickN.value);
+    if (!Number.isFinite(monsterIdx) || monsterIdx < 0) return;
+    if (!Number.isFinite(X) || X < 1) return;
+
+    const candidates = [];
+    for (let i = 0; i < data.characters.length; i++) {
+      if (!data.owned[i]) continue;                  // 未所持は抽選しない
+      if (!data.matrix[i][monsterIdx]) candidates.push(i);
+    }
+
+    clearResult();
+
+    if (candidates.length === 0) {
+      resultWarn.textContent = "このキャンサー列は（所持キャラの中で）全員TRUEです（未チェックがありません）";
+      return;
+    }
+
+    const picksCount = Math.min(X, candidates.length);
+    const picks = secureShuffle(candidates).slice(0, picksCount);
+    lastDraw = { monsterIdx, picks };
+
+    resultMeta.textContent = `未チェック ${candidates.length}名 / 抽選 ${picksCount}名`;
+    picks.forEach((idx) => {
+      const li = document.createElement("li");
+      li.textContent = data.characters[idx];
+      resultList.appendChild(li);
+    });
+
+    if (X > candidates.length) {
+      resultWarn.textContent = `注意：未チェックが${candidates.length}名しかないため、抽選人数は${picksCount}名に丸めました。`;
+    }
+  }
+
+  function commit() {
+    if (!data || !lastDraw) return;
+    const { monsterIdx, picks } = lastDraw;
+
+    picks.forEach(i => { data.matrix[i][monsterIdx] = true; });
+
+    const time = new Date().toLocaleString();
+    const monster = data.monsters[monsterIdx];
+    const names = picks.map(i => data.characters[i]);
+    history.push({ time, monster, names });
+
+    renderTable();
+    renderHistory();
+    updateQuartz();
+    save();
+
+    resultWarn.textContent = "確定しました。該当キャラをTRUEに反映済みです。";
+  }
+
+  async function readFileAsText(file) { return await file.text(); }
+
+  function initFromCSVText(text, label="CSV読み込み完了") {
+    const rows = parseCSV(text);
+    data = buildFromRows(rows);
+    history = [];
+    lastDraw = null;
+
+    rebuildMonsterSelect();
+    setEnabled(true);
+    clearResult();
+    renderTable();
+    renderHistory();
+    updateQuartz();
+    save();
+    statusText.textContent = `${label} / ${new Date().toLocaleString()}`;
+  }
+
+  // ===== Events =====
+  csvFile.addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await readFileAsText(file);
+      initFromCSVText(text, "CSV読み込み完了");
+    } catch (err) {
+      alert("読み込み失敗: " + (err?.message ?? err));
+    } finally {
+      csvFile.value = "";
+    }
+  });
+
+  loadBuiltIn.addEventListener("click", () => {
+    try { initFromCSVText(BUILTIN_CSV, "内蔵CSVを読み込み"); }
+    catch (err) { alert("内蔵CSVの読み込み失敗: " + (err?.message ?? err)); }
+  });
+
+  downloadBuiltIn.addEventListener("click", () => {
+    const withBOM = "\uFEFF" + BUILTIN_CSV.replace(/^\uFEFF/, "");
+    downloadText("異時層称号バッジ.csv", withBOM, "text/csv;charset=utf-8");
+  });
+
+  loadSaved.addEventListener("click", () => {
+    const payload = loadSavedData();
+    if (!payload || !payload.data) {
+      alert("保存データが見つかりません。CSVを読み込んでください。");
+      return;
+    }
+    data = payload.data;
+    history = payload.history ?? [];
+    lastDraw = null;
+
+    if (payload.ui) {
+      hideUnowned.checked = !!payload.ui.hideUnowned;
+      search.value = payload.ui.search ?? "";
+    }
+
+    rebuildMonsterSelect();
+    setEnabled(true);
+    clearResult();
+    renderTable();
+    renderHistory();
+    updateQuartz();
+    statusText.textContent = `保存データを読み込み / ${new Date().toLocaleString()}`;
+    save();
+  });
+
+  clearSaved.addEventListener("click", () => {
+    localStorage.removeItem(LS_KEY);
+    data = null;
+    history = [];
+    lastDraw = null;
+    monsterSelect.innerHTML = `<option value="">CSVを読み込んでください</option>`;
+    setEnabled(false);
+    clearResult();
+    table.innerHTML = "";
+    renderHistory();
+    statusText.textContent = "保存を削除";
+    alert("保存データを削除しました。");
+  });
+
+  drawBtn.addEventListener("click", draw);
+  commitBtn.addEventListener("click", commit);
+
+  exportCsv.addEventListener("click", () => {
+    if (!data) return;
+    const text = "\uFEFF" + toCSVWithOwned(data);
+    downloadText("チェック状態_export_所持付き.csv", text, "text/csv;charset=utf-8");
+  });
+
+  exportJson.addEventListener("click", () => {
+    if (!data) return;
+    downloadText("バックアップ.json", JSON.stringify({ data, history }, null, 2), "application/json");
+  });
+
+  hideUnowned.addEventListener("change", () => {
+    if (!data) return;
+    renderTable();
+    updateQuartz();
+    save();
+  });
+
+  search.addEventListener("input", () => {
+    if (!data) return;
+    renderTable();
+    // quartzは全体値なので検索では変えない
+    save();
+  });
+
+  // Table click delegation (toggle)
+  table.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn || !data) return;
+
+    const type = btn.getAttribute("data-type");
+    const i = Number(btn.getAttribute("data-i"));
+
+    if (type === "own") {
+      data.owned[i] = !data.owned[i];
+      // 未所持にした瞬間、抽選結果がそのキャラ含んでたら消す
+      if (lastDraw && lastDraw.picks.includes(i)) {
+        lastDraw.picks = lastDraw.picks.filter(x => x !== i);
+        // 表示も更新
+        draw(); // 再抽選まではしない、ただし簡単のため再表示を整える
+      }
+      renderTable();
+      updateQuartz();
+      save();
+      return;
+    }
+
+    if (type === "cell") {
+      const j = Number(btn.getAttribute("data-j"));
+      data.matrix[i][j] = !data.matrix[i][j];
+      renderTable();
+      updateQuartz();
+      save();
+      return;
+    }
+  });
+
+  // Initial
+  setEnabled(false);
+  renderHistory();
+})();
+</script>
+</body>
+</html>
